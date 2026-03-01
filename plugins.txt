@@ -10,3 +10,4 @@ workflow-cps
 workflow-step-api
 workflow-api
 pipeline-stage-view
+rebuild
