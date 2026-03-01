@@ -32,49 +32,68 @@ pipeline {
                     string(credentialsId: 'OVH_PASSWORD', variable: 'OS_PASSWORD')
                 ]) {
                     script {
-                        // Pobierz token OpenStack
-                        def authResponse = sh(script: """
-                            curl -s -X POST https://auth.cloud.ovh.net/v3/auth/tokens \\
-                              -H 'Content-Type: application/json' \\
-                              -d '{
-                                "auth": {
-                                  "identity": {
-                                    "methods": ["password"],
-                                    "password": {
-                                      "user": {
-                                        "name": "${OS_USERNAME}",
-                                        "domain": {"id": "default"},
-                                        "password": "${OS_PASSWORD}"
-                                      }
-                                    }
-                                  },
-                                  "scope": {
-                                    "project": {"id": "${OS_TENANT_ID}"}
-                                  }
-                                }
-                              }' -D - -o /tmp/os_auth_body.json
-                        """, returnStdout: true).trim()
+                        // Zapisz payload auth do pliku - unikamy interpolacji sekretów w Groovy
+                        sh '''
+                            cat > /tmp/os_auth_payload.json << 'JSONEOF'
+{
+  "auth": {
+    "identity": {
+      "methods": ["password"],
+      "password": {
+        "user": {
+          "name": "PLACEHOLDER_USERNAME",
+          "domain": {"id": "default"},
+          "password": "PLACEHOLDER_PASSWORD"
+        }
+      }
+    },
+    "scope": {
+      "project": {"id": "PLACEHOLDER_TENANT"}
+    }
+  }
+}
+JSONEOF
+                            sed -i "s/PLACEHOLDER_USERNAME/${OS_USERNAME}/" /tmp/os_auth_payload.json
+                            sed -i "s/PLACEHOLDER_PASSWORD/${OS_PASSWORD}/" /tmp/os_auth_payload.json
+                            sed -i "s/PLACEHOLDER_TENANT/${OS_TENANT_ID}/" /tmp/os_auth_payload.json
+                        '''
 
-                        def token = sh(script: "grep -i '^x-subject-token:' /tmp/os_auth_body.json | awk '{print \$2}' | tr -d '\\r'", returnStdout: true).trim()
+                        // Pobierz token
+                        sh '''
+                            curl -s -X POST https://auth.cloud.ovh.net/v3/auth/tokens \
+                              -H "Content-Type: application/json" \
+                              -d @/tmp/os_auth_payload.json \
+                              -D /tmp/os_auth_headers.txt \
+                              -o /tmp/os_auth_body.json
+                            echo "--- Auth headers ---"
+                            cat /tmp/os_auth_headers.txt
+                        '''
+
+                        def token = sh(script: "grep -i '^x-subject-token:' /tmp/os_auth_headers.txt | awk '{print \$2}' | tr -d '\\r\\n'", returnStdout: true).trim()
                         if (!token) {
+                            sh 'cat /tmp/os_auth_body.json || true'
                             error("Nie udało się uzyskać tokenu OpenStack. Sprawdź credentials OVH.")
                         }
                         echo "Token uzyskany pomyślnie."
+                        env.OS_TOKEN = token
 
                         // Pobierz ID instancji po nazwie
+                        def region = params.REGION.toLowerCase()
+                        def instanceName = params.INSTANCE_NAME
+
                         def serversJson = sh(script: """
-                            curl -s "https://compute.${params.REGION.toLowerCase()}.cloud.ovh.net/v2.1/${OS_TENANT_ID}/servers?name=${params.INSTANCE_NAME}" \\
-                              -H "X-Auth-Token: ${token}"
+                            curl -s "https://compute.${region}.cloud.ovh.net/v2.1/\${OS_TENANT_ID}/servers?name=${instanceName}" \
+                              -H "X-Auth-Token: \${OS_TOKEN}"
                         """, returnStdout: true).trim()
 
                         echo "Servers response: ${serversJson}"
 
                         def instanceId = sh(script: """
-                            echo '${serversJson}' | grep -o '"id": *"[^"]*"' | head -1 | grep -o '"[^"]*"\$' | tr -d '"'
+                            echo '${serversJson}' | python3 -c "import sys,json; servers=json.load(sys.stdin).get('servers',[]); print(next((s['id'] for s in servers if s['name']=='${instanceName}'),''))"
                         """, returnStdout: true).trim()
 
                         if (!instanceId) {
-                            error("Nie znaleziono instancji o nazwie '${params.INSTANCE_NAME}' w regionie ${params.REGION}")
+                            error("Nie znaleziono instancji o nazwie '${instanceName}' w regionie ${params.REGION}")
                         }
                         env.INSTANCE_ID = instanceId
                         echo "Instance ID: ${instanceId}"
@@ -83,9 +102,9 @@ pipeline {
                             cd \${WORKSPACE}/ovh-instance
                             PUBLIC_KEY=\$(cat /var/jenkins_home/.ssh/id_ed25519.pub)
                             /usr/local/bin/terraform import \
-                              -var "tenant_id=${OS_TENANT_ID}" \
-                              -var "user_name=${OS_USERNAME}" \
-                              -var "password=${OS_PASSWORD}" \
+                              -var "tenant_id=\${OS_TENANT_ID}" \
+                              -var "user_name=\${OS_USERNAME}" \
+                              -var "password=\${OS_PASSWORD}" \
                               -var "region=${params.REGION}" \
                               -var "keypair_name=${params.KEYPAIR_NAME}" \
                               -var "public_key=\${PUBLIC_KEY}" \
@@ -93,9 +112,9 @@ pipeline {
                               openstack_compute_keypair_v2.keypair ${params.KEYPAIR_NAME} 2>/dev/null || true
 
                             /usr/local/bin/terraform import \
-                              -var "tenant_id=${OS_TENANT_ID}" \
-                              -var "user_name=${OS_USERNAME}" \
-                              -var "password=${OS_PASSWORD}" \
+                              -var "tenant_id=\${OS_TENANT_ID}" \
+                              -var "user_name=\${OS_USERNAME}" \
+                              -var "password=\${OS_PASSWORD}" \
                               -var "region=${params.REGION}" \
                               -var "keypair_name=${params.KEYPAIR_NAME}" \
                               -var "public_key=\${PUBLIC_KEY}" \
