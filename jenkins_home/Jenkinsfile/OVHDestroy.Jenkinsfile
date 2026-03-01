@@ -156,7 +156,7 @@ JSONEOF
             echo "=== Instancja '${params.INSTANCE_NAME}' została usunięta ==="
         }
         always {
-            sh 'rm -rf ${WORKSPACE}/ovh-instance || true'
+            sh 'rm -rf ${WORKSPACE}/ovh-instance /tmp/os_auth_payload.json /tmp/os_auth_headers.txt /tmp/os_auth_body.json /tmp/os_token.txt /tmp/os_servers.json || true'
         }
     }
 }
