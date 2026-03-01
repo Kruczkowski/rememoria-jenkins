@@ -61,6 +61,7 @@ pipeline {
                     ).trim()
                     env.INSTANCE_IP = ip
                     echo "Instance IP: ${ip}"
+                    currentBuild.description = "INSTANCE_IP:${ip}"
                 }
             }
         }
