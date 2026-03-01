@@ -1,7 +1,7 @@
 FROM jenkins/jenkins:lts
 
 USER root
-RUN apt-get update && apt-get install -y curl unzip \
+RUN apt-get update && apt-get install -y curl unzip python3-openstackclient \
     && apt-get clean && rm -rf /var/lib/apt/lists/* \
     && curl -fsSL "https://github.com/runpod/runpodctl/releases/download/v1.14.3/runpodctl-linux-amd64" -o /usr/local/bin/runpodctl \
     && chmod +x /usr/local/bin/runpodctl \

@@ -137,6 +137,23 @@ jobs:
         }
       }
   - script: |
+      pipelineJob('ovh-destroy-instance') {
+        description('Pipeline do usuwania instancji OVH Public Cloud przez Terraform')
+        parameters {
+          stringParam('INSTANCE_NAME', 'rememotion-instance', 'Nazwa instancji do usunięcia')
+          stringParam('FLAVOR', 'd2-4', 'Typ instancji OVH')
+          stringParam('IMAGE_NAME', 'Ubuntu 24.04', 'Obraz systemu')
+          stringParam('REGION', 'WAW1', 'Region OVH')
+          stringParam('KEYPAIR_NAME', 'rememotion-key', 'Nazwa klucza SSH w OVH')
+        }
+        definition {
+          cps {
+            script(new File('/var/jenkins_home/Jenkinsfiles/OVHDestroy.Jenkinsfile').text)
+            sandbox(true)
+          }
+        }
+      }
+  - script: |
       pipelineJob('full-deploy') {
         description('Kompletny deployment ReMemotion: tworzy infrastrukturę OVH + RunPod i wykonuje deploy na obu środowiskach')
         parameters {
