@@ -75,21 +75,24 @@ JSONEOF
                             error("Nie udało się uzyskać tokenu OpenStack. Sprawdź credentials OVH.")
                         }
                         echo "Token uzyskany pomyślnie."
-                        env.OS_TOKEN = token
 
                         // Pobierz ID instancji po nazwie
                         def region = params.REGION.toLowerCase()
                         def instanceName = params.INSTANCE_NAME
 
-                        def serversJson = sh(script: """
-                            curl -s "https://compute.${region}.cloud.ovh.net/v2.1/\${OS_TENANT_ID}/servers?name=${instanceName}" \
-                              -H "X-Auth-Token: \${OS_TOKEN}"
-                        """, returnStdout: true).trim()
+                        // Token do pliku - nie trafia do env Jenkins
+                        sh "printf '%s' '${token}' > /tmp/os_token.txt"
 
-                        echo "Servers response: ${serversJson}"
+                        sh """
+                            curl -s "https://compute.${region}.cloud.ovh.net/v2.1/\${OS_TENANT_ID}/servers?name=${instanceName}" \
+                              -H "X-Auth-Token: \$(cat /tmp/os_token.txt)" \
+                              -o /tmp/os_servers.json
+                            echo "--- Servers response ---"
+                            cat /tmp/os_servers.json
+                        """
 
                         def instanceId = sh(script: """
-                            echo '${serversJson}' | python3 -c "import sys,json; servers=json.load(sys.stdin).get('servers',[]); print(next((s['id'] for s in servers if s['name']=='${instanceName}'),''))"
+                            python3 -c "import json; servers=json.load(open('/tmp/os_servers.json')).get('servers',[]); print(next((s['id'] for s in servers if s['name']=='${instanceName}'),''))"
                         """, returnStdout: true).trim()
 
                         if (!instanceId) {
