@@ -110,7 +110,7 @@ pipeline {
                     steps {
                         script {
                             def podBuild = build(
-                                job: 'runpod-create-pod-volume',
+                                job: 'runpod-create-pod-with-volume',
                                 parameters: [
                                     string(name: 'GPU_TYPE',           value: params.GPU_TYPE),
                                     string(name: 'DISK_SIZE',          value: params.DISK_SIZE),
@@ -139,7 +139,7 @@ pipeline {
                 script {
                     echo "Deploying to RunPod pod ${env.POD_ID} with OVH IP ${env.INSTANCE_IP}..."
                     build(
-                        job: 'runpod-deploy',
+                        job: 'runpod-deploy-application',
                         parameters: [
                             string(name: 'POD_ID',  value: env.POD_ID),
                             string(name: 'OVH_IP',  value: env.INSTANCE_IP),

@@ -133,3 +133,25 @@ jobs:
           }
         }
       }
+  - script: |
+      pipelineJob('full-deploy') {
+        description('Kompletny deployment ReMemotion: tworzy infrastrukturę OVH + RunPod i wykonuje deploy na obu środowiskach')
+        parameters {
+          stringParam('NETWORK_VOLUME_ID', '', '[WYMAGANE] ID Network Storage w RunPod')
+          stringParam('BRANCH', 'main', 'Branch repozytorium do wdrożenia')
+          stringParam('GPU_TYPE', 'NVIDIA RTX 2000 Ada Generation', 'Typ GPU w RunPod')
+          stringParam('DISK_SIZE', '10', 'Rozmiar dysku kontenera RunPod (GB)')
+          stringParam('IMAGE', 'ghcr.io/kruczkowski/rememotion-python-base:latest', 'Obraz Docker dla poda RunPod')
+          stringParam('OVH_INSTANCE_NAME', 'rememotion-instance', 'Nazwa instancji OVH')
+          stringParam('OVH_FLAVOR', 'd2-4', 'Typ instancji OVH (np. d2-4)')
+          stringParam('OVH_IMAGE_NAME', 'Ubuntu 24.04', 'Obraz systemu OVH')
+          stringParam('OVH_REGION', 'WAW1', 'Region OVH')
+          stringParam('OVH_KEYPAIR_NAME', 'rememotion-key', 'Nazwa klucza SSH w OVH')
+        }
+        definition {
+          cps {
+            script(new File('/var/jenkins_home/Jenkinsfiles/FullDeploy.Jenkinsfile').text)
+            sandbox(true)
+          }
+        }
+      }
