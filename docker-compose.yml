@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  jenkins:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: rememoria-jenkins:custom
+    container_name: jenkins
+    ports:
+      - "9090:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - ./jenkins_home/casc_configs:/var/jenkins_home/casc_configs:ro
+      - ./jenkins_home/Jenkinsfile:/var/jenkins_home/Jenkinsfiles:ro
+      - ./terraform:/opt/terraform:ro
+      - ~/.ssh/id_ed25519:/var/jenkins_home/.ssh/id_ed25519:ro
+      - ~/.ssh/id_ed25519.pub:/var/jenkins_home/.ssh/id_ed25519.pub:ro
+    env_file:
+      - .env
+    environment:
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
+      - CASC_JENKINS_CONFIG=/var/jenkins_home/casc_configs/jenkins-jcasc.yaml
+    restart: unless-stopped
+
+volumes:
+  jenkins_home:

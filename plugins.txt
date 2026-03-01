@@ -1,0 +1,11 @@
+credentials
+credentials-binding
+aws-credentials
+configuration-as-code
+job-dsl
+git
+workflow-aggregator
+workflow-job
+workflow-cps
+workflow-step-api
+workflow-api

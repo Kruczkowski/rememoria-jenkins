@@ -1,0 +1,135 @@
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - string:
+              id: "RUNPOD_API_KEY"
+              description: "RunPod API Key"
+              secret: "${RUNPOD_API_KEY}"
+              scope: GLOBAL
+          - string:
+              id: "RUNPOD_REGISTRY_AUTH_ID"
+              description: "ID credentiali do rejestru Docker w RunPod"
+              secret: "${RUNPOD_REGISTRY_AUTH_ID}"
+              scope: GLOBAL
+          - string:
+              id: "OVH_TENANT_ID"
+              description: "OVH Project ID (Tenant ID)"
+              secret: "${OVH_TENANT_ID}"
+              scope: GLOBAL
+          - string:
+              id: "OVH_USERNAME"
+              description: "OVH OpenStack username"
+              secret: "${OVH_USERNAME}"
+              scope: GLOBAL
+          - string:
+              id: "OVH_PASSWORD"
+              description: "OVH OpenStack password"
+              secret: "${OVH_PASSWORD}"
+              scope: GLOBAL
+          - string:
+              id: "GITHUB_TOKEN"
+              description: "GitHub Personal Access Token"
+              secret: "${GITHUB_TOKEN}"
+              scope: GLOBAL
+          - basicSSHUserPrivateKey:
+              id: "OVH_SSH_KEY"
+              description: "Klucz SSH do VM OVH (rememotion-key)"
+              username: "ubuntu"
+              privateKeySource:
+                directEntry:
+                  privateKey: "${readFile:/var/jenkins_home/.ssh/rememotion-key}"
+              scope: GLOBAL
+
+jobs:
+  - script: |
+      pipelineJob('runpod-create-pod') {
+        description('Pipeline do tworzenia poda w Runpod')
+        parameters {
+          stringParam('GPU_TYPE', 'NVIDIA RTX 2000 Ada Generation', 'Typ GPU')
+          stringParam('DISK_SIZE', '10', 'Rozmiar dysku w GB')
+          stringParam('IMAGE', 'ghcr.io/kruczkowski/rememotion-python-base:latest', 'Obraz Docker')
+        }
+        definition {
+          cps {
+            script(new File('/var/jenkins_home/Jenkinsfiles/Pod.Jenkinsfile').text)
+            sandbox(true)
+          }
+        }
+      }
+  - script: |
+      pipelineJob('runpod-remove-pod') {
+        description('Pipeline do usuwania poda w Runpod')
+        parameters {
+          stringParam('POD_ID', '', 'ID poda do usunięcia')
+        }
+        definition {
+          cps {
+            script(new File('/var/jenkins_home/Jenkinsfiles/RemovePod.Jenkinsfile').text)
+            sandbox(true)
+          }
+        }
+      }
+  - script: |
+      pipelineJob('runpod-create-pod-with-volume') {
+        description('Pipeline do tworzenia poda w Runpod z podmontowanym Network Volume')
+        parameters {
+          stringParam('GPU_TYPE', 'NVIDIA RTX 2000 Ada Generation', 'Typ GPU')
+          stringParam('DISK_SIZE', '10', 'Rozmiar dysku w GB')
+          stringParam('NETWORK_VOLUME_ID', '', 'ID Network Volume do podmontowania')
+          stringParam('IMAGE', 'ghcr.io/kruczkowski/rememotion-python-base:latest', 'Obraz Docker')
+        }
+        definition {
+          cps {
+            script(new File('/var/jenkins_home/Jenkinsfiles/PodWithVolume.Jenkinsfile').text)
+            sandbox(true)
+          }
+        }
+      }
+  - script: |
+      pipelineJob('runpod-deploy-application') {
+        description('Pipeline do deploymentu aplikacji Python na podzie RunPod')
+        parameters {
+          stringParam('POD_ID', '', 'ID poda RunPod')
+          stringParam('OVH_IP', '', 'Publiczny adres IP VM OVH (używany w URL-ach)')
+          stringParam('BRANCH', 'main', 'Branch do wdrożenia')
+        }
+        definition {
+          cps {
+            script(new File('/var/jenkins_home/Jenkinsfiles/RunPodDeploy.Jenkinsfile').text)
+            sandbox(true)
+          }
+        }
+      }
+  - script: |
+      pipelineJob('ovh-create-instance') {
+        description('Pipeline do tworzenia instancji OVH Public Cloud przez Terraform')
+        parameters {
+          stringParam('INSTANCE_NAME', 'rememotion-instance', 'Nazwa instancji')
+          stringParam('FLAVOR', 'd2-4', 'Typ instancji OVH')
+          stringParam('IMAGE_NAME', 'Ubuntu 24.04', 'Obraz systemu (Ubuntu LTS)')
+          stringParam('REGION', 'WAW1', 'Region OVH (WAW1 - Warszawa)')
+          stringParam('KEYPAIR_NAME', 'rememotion-key', 'Nazwa klucza SSH w OVH')
+        }
+        definition {
+          cps {
+            script(new File('/var/jenkins_home/Jenkinsfiles/OVHInstance.Jenkinsfile').text)
+            sandbox(true)
+          }
+        }
+      }
+  - script: |
+      pipelineJob('ovh-deploy-application') {
+        description('Pipeline do deploymentu aplikacji na VM OVH')
+        parameters {
+          stringParam('VM_IP', '', 'Publiczny adres IP VM (z outputu terraform)')
+          stringParam('VM_USER', 'ubuntu', 'Użytkownik SSH na VM')
+          stringParam('BRANCH', 'main', 'Branch do wdrożenia')
+        }
+        definition {
+          cps {
+            script(new File('/var/jenkins_home/Jenkinsfiles/OVHDeploy.Jenkinsfile').text)
+            sandbox(true)
+          }
+        }
+      }
