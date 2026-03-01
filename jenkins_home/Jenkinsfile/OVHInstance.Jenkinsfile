@@ -73,14 +73,5 @@ pipeline {
                 }
             }
         }
-        stage('Deploy Application') {
-            steps {
-                build job: 'ovh-deploy-application',
-                      parameters: [
-                          string(name: 'VM_IP', value: env.INSTANCE_IP),
-                          string(name: 'VM_USER', value: 'ubuntu')
-                      ]
-            }
-        }
     }
 }

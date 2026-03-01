@@ -82,7 +82,7 @@ pipeline {
             parallel {
                 failFast true
 
-                stage('Create OVH Instance + Deploy OVH') {
+                stage('Create OVH Instance') {
                     steps {
                         script {
                             def ovhBuild = build(
@@ -134,7 +134,26 @@ pipeline {
             }
         }
 
-        // Stage 3 - deploy w RunPod (po uruchomieniu infra)
+        // Stage 3 - deploy na OVH
+        stage('Deploy to OVH') {
+            steps {
+                script {
+                    echo "Deploying application to OVH instance ${env.INSTANCE_IP}..."
+                    build(
+                        job: 'ovh-deploy-application',
+                        parameters: [
+                            string(name: 'VM_IP',   value: env.INSTANCE_IP),
+                            string(name: 'VM_USER', value: 'ubuntu'),
+                            string(name: 'BRANCH',  value: params.BRANCH)
+                        ],
+                        propagate: true,
+                        wait: true
+                    )
+                }
+            }
+        }
+
+        // Stage 4 - deploy w RunPod
         stage('Deploy to RunPod') {
             steps {
                 script {
