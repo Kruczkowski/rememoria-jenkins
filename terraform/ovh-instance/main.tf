@@ -20,16 +20,15 @@ data "openstack_images_image_v2" "ubuntu_lts" {
   most_recent = true
 }
 
-resource "openstack_compute_keypair_v2" "keypair" {
-  name       = var.keypair_name
-  public_key = var.public_key
+data "openstack_compute_keypair_v2" "keypair" {
+  name = var.keypair_name
 }
 
 resource "openstack_compute_instance_v2" "instance" {
   name            = var.instance_name
   flavor_name     = var.flavor
   image_id        = data.openstack_images_image_v2.ubuntu_lts.id
-  key_pair        = openstack_compute_keypair_v2.keypair.name
+  key_pair        = data.openstack_compute_keypair_v2.keypair.name
   region          = var.region
   user_data       = file("${path.module}/user_data.sh")
 
