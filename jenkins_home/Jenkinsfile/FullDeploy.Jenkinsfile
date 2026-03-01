@@ -80,6 +80,7 @@ pipeline {
         // Stage 1 + 2 równolegle - tworzenie infrastruktury
         stage('Create Infrastructure') {
             parallel {
+                failFast true
 
                 stage('Create OVH Instance + Deploy OVH') {
                     steps {
