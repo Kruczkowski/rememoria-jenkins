@@ -1,3 +1,6 @@
+jenkins:
+  numExecutors: 6
+
 credentials:
   system:
     domainCredentials:
