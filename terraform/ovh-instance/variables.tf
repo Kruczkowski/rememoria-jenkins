@@ -36,6 +36,11 @@ variable "keypair_name" {
   default     = "rememotion-key"
 }
 
+variable "public_key" {
+  description = "Zawartość klucza publicznego SSH do importu w OVH"
+  sensitive   = true
+}
+
 variable "instance_name" {
   description = "Nazwa instancji"
   default     = "rememotion-instance"

@@ -33,6 +33,15 @@ pipeline {
                 ]) {
                     sh '''
                         cd ${WORKSPACE}/ovh-instance
+                        PUBLIC_KEY=$(cat /var/jenkins_home/.ssh/id_ed25519.pub)
+                        # Import keypair if it already exists in OVH (idempotent)
+                        /usr/local/bin/terraform import \
+                          -var "tenant_id=${OS_TENANT_ID}" \
+                          -var "user_name=${OS_USERNAME}" \
+                          -var "password=${OS_PASSWORD}" \
+                          -var "region=${REGION}" \
+                          -var "public_key=${PUBLIC_KEY}" \
+                          openstack_compute_keypair_v2.keypair ${KEYPAIR_NAME} 2>/dev/null || true
                         /usr/local/bin/terraform apply -auto-approve \
                           -var "tenant_id=${OS_TENANT_ID}" \
                           -var "user_name=${OS_USERNAME}" \
@@ -41,6 +50,7 @@ pipeline {
                           -var "flavor=${FLAVOR}" \
                           -var "image_name=${IMAGE_NAME}" \
                           -var "keypair_name=${KEYPAIR_NAME}" \
+                          -var "public_key=${PUBLIC_KEY}" \
                           -var "instance_name=${INSTANCE_NAME}"
                     '''
                 }
