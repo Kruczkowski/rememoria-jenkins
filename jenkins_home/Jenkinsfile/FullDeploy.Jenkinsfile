@@ -77,64 +77,33 @@ pipeline {
             }
         }
 
-        // Stage 1 + 2 równolegle - tworzenie infrastruktury
-        stage('Create Infrastructure') {
-            failFast true
-            parallel {
-
-                stage('Create OVH Instance') {
-                    steps {
-                        script {
-                            def ovhBuild = build(
-                                job: 'ovh-create-instance',
-                                parameters: [
-                                    string(name: 'INSTANCE_NAME', value: params.OVH_INSTANCE_NAME),
-                                    string(name: 'FLAVOR',        value: params.OVH_FLAVOR),
-                                    string(name: 'IMAGE_NAME',    value: params.OVH_IMAGE_NAME),
-                                    string(name: 'REGION',        value: params.OVH_REGION),
-                                    string(name: 'KEYPAIR_NAME',  value: params.OVH_KEYPAIR_NAME)
-                                ],
-                                propagate: true,
-                                wait: true
-                            )
-                            def instanceIp = parseInstanceIp(ovhBuild.description ?: '')
-                            if (!instanceIp) {
-                                error("Nie udało się odczytać IP instancji OVH z opisu builda. Opis: ${ovhBuild.description}")
-                            }
-                            env.INSTANCE_IP = instanceIp
-                            echo "OVH Instance IP: ${env.INSTANCE_IP}"
-                        }
+        // Stage 1 - tworzenie instancji OVH
+        stage('Create OVH Instance') {
+            steps {
+                script {
+                    def ovhBuild = build(
+                        job: 'ovh-create-instance',
+                        parameters: [
+                            string(name: 'INSTANCE_NAME', value: params.OVH_INSTANCE_NAME),
+                            string(name: 'FLAVOR',        value: params.OVH_FLAVOR),
+                            string(name: 'IMAGE_NAME',    value: params.OVH_IMAGE_NAME),
+                            string(name: 'REGION',        value: params.OVH_REGION),
+                            string(name: 'KEYPAIR_NAME',  value: params.OVH_KEYPAIR_NAME)
+                        ],
+                        propagate: true,
+                        wait: true
+                    )
+                    def instanceIp = parseInstanceIp(ovhBuild.description ?: '')
+                    if (!instanceIp) {
+                        error("Nie udało się odczytać IP instancji OVH z opisu builda. Opis: ${ovhBuild.description}")
                     }
+                    env.INSTANCE_IP = instanceIp
+                    echo "OVH Instance IP: ${env.INSTANCE_IP}"
                 }
-
-                stage('Create RunPod Pod with Volume') {
-                    steps {
-                        script {
-                            def podBuild = build(
-                                job: 'runpod-create-pod-with-volume',
-                                parameters: [
-                                    string(name: 'GPU_TYPE',           value: params.GPU_TYPE),
-                                    string(name: 'DISK_SIZE',          value: params.DISK_SIZE),
-                                    string(name: 'NETWORK_VOLUME_ID',  value: params.NETWORK_VOLUME_ID),
-                                    string(name: 'IMAGE',              value: params.IMAGE)
-                                ],
-                                propagate: true,
-                                wait: true
-                            )
-                            def podId = parsePodId(podBuild.description ?: '')
-                            if (!podId) {
-                                error("Nie udało się odczytać Pod ID z opisu builda. Opis: ${podBuild.description}")
-                            }
-                            env.POD_ID = podId
-                            echo "RunPod Pod ID: ${env.POD_ID}"
-                        }
-                    }
-                }
-
             }
         }
 
-        // Stage 3 - deploy na OVH
+        // Stage 2 - deploy na OVH
         stage('Deploy to OVH') {
             steps {
                 script {
@@ -149,6 +118,31 @@ pipeline {
                         propagate: true,
                         wait: true
                     )
+                }
+            }
+        }
+
+        // Stage 3 - tworzenie poda RunPod
+        stage('Create RunPod Pod with Volume') {
+            steps {
+                script {
+                    def podBuild = build(
+                        job: 'runpod-create-pod-with-volume',
+                        parameters: [
+                            string(name: 'GPU_TYPE',          value: params.GPU_TYPE),
+                            string(name: 'DISK_SIZE',         value: params.DISK_SIZE),
+                            string(name: 'NETWORK_VOLUME_ID', value: params.NETWORK_VOLUME_ID),
+                            string(name: 'IMAGE',             value: params.IMAGE)
+                        ],
+                        propagate: true,
+                        wait: true
+                    )
+                    def podId = parsePodId(podBuild.description ?: '')
+                    if (!podId) {
+                        error("Nie udało się odczytać Pod ID z opisu builda. Opis: ${podBuild.description}")
+                    }
+                    env.POD_ID = podId
+                    echo "RunPod Pod ID: ${env.POD_ID}"
                 }
             }
         }
