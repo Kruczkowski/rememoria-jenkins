@@ -42,15 +42,15 @@ else
 fi
 
 cd rememoria
-docker compose -f docker-compose.vps.yml up -d --force-recreate
+sudo docker compose -f docker-compose.vps.yml up -d --force-recreate
 
 echo "Waiting for containers to be ready..."
-until docker compose -f docker-compose.vps.yml exec -T php php -v > /dev/null 2>&1; do
+until sudo docker compose -f docker-compose.vps.yml exec -T php php -v > /dev/null 2>&1; do
     sleep 5
 done
 
-docker compose -f docker-compose.vps.yml exec -T php composer install --no-interaction --prefer-dist --no-progress
-docker compose -f docker-compose.vps.yml exec -T php php bin/console doctrine:migrations:migrate --no-interaction
+sudo docker compose -f docker-compose.vps.yml exec -T php composer install --no-interaction --prefer-dist --no-progress
+sudo docker compose -f docker-compose.vps.yml exec -T php php bin/console doctrine:migrations:migrate --no-interaction
 
 echo "Deploy zakończony sukcesem."
 """
