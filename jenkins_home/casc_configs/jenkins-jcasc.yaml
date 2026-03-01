@@ -154,6 +154,24 @@ jobs:
         }
       }
   - script: |
+      pipelineJob('full-destroy') {
+        description('Usuwa jednocześnie pod RunPod i instancję OVH')
+        parameters {
+          stringParam('POD_ID', '', '[WYMAGANE] ID poda RunPod do usunięcia')
+          stringParam('INSTANCE_NAME', 'rememotion-instance', 'Nazwa instancji OVH do usunięcia')
+          stringParam('FLAVOR', 'd2-4', 'Typ instancji OVH')
+          stringParam('IMAGE_NAME', 'Ubuntu 24.04', 'Obraz systemu OVH')
+          stringParam('REGION', 'WAW1', 'Region OVH')
+          stringParam('KEYPAIR_NAME', 'rememotion-key', 'Nazwa klucza SSH w OVH')
+        }
+        definition {
+          cps {
+            script(new File('/var/jenkins_home/Jenkinsfiles/FullDestroy.Jenkinsfile').text)
+            sandbox(true)
+          }
+        }
+      }
+  - script: |
       pipelineJob('full-deploy') {
         description('Kompletny deployment ReMemotion: tworzy infrastrukturę OVH + RunPod i wykonuje deploy na obu środowiskach')
         parameters {
