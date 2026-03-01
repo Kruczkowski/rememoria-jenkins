@@ -32,21 +32,49 @@ pipeline {
                     string(credentialsId: 'OVH_PASSWORD', variable: 'OS_PASSWORD')
                 ]) {
                     script {
-                        def publicKey = sh(script: 'cat /var/jenkins_home/.ssh/id_ed25519.pub', returnStdout: true).trim()
-                        env.PUBLIC_KEY = publicKey
+                        // Pobierz token OpenStack
+                        def authResponse = sh(script: """
+                            curl -s -X POST https://auth.cloud.ovh.net/v3/auth/tokens \\
+                              -H 'Content-Type: application/json' \\
+                              -d '{
+                                "auth": {
+                                  "identity": {
+                                    "methods": ["password"],
+                                    "password": {
+                                      "user": {
+                                        "name": "${OS_USERNAME}",
+                                        "domain": {"id": "default"},
+                                        "password": "${OS_PASSWORD}"
+                                      }
+                                    }
+                                  },
+                                  "scope": {
+                                    "project": {"id": "${OS_TENANT_ID}"}
+                                  }
+                                }
+                              }' -D - -o /tmp/os_auth_body.json
+                        """, returnStdout: true).trim()
+
+                        def token = sh(script: "grep -i '^x-subject-token:' /tmp/os_auth_body.json | awk '{print \$2}' | tr -d '\\r'", returnStdout: true).trim()
+                        if (!token) {
+                            error("Nie udało się uzyskać tokenu OpenStack. Sprawdź credentials OVH.")
+                        }
+                        echo "Token uzyskany pomyślnie."
 
                         // Pobierz ID instancji po nazwie
+                        def serversJson = sh(script: """
+                            curl -s "https://compute.${params.REGION.toLowerCase()}.cloud.ovh.net/v2.1/${OS_TENANT_ID}/servers?name=${params.INSTANCE_NAME}" \\
+                              -H "X-Auth-Token: ${token}"
+                        """, returnStdout: true).trim()
+
+                        echo "Servers response: ${serversJson}"
+
                         def instanceId = sh(script: """
-                            export OS_AUTH_URL=https://auth.cloud.ovh.net/v3
-                            export OS_TENANT_ID=${OS_TENANT_ID}
-                            export OS_USERNAME=${OS_USERNAME}
-                            export OS_PASSWORD=${OS_PASSWORD}
-                            export OS_REGION_NAME=${REGION}
-                            openstack server list --name "^${INSTANCE_NAME}\$" -f value -c ID 2>/dev/null || true
+                            echo '${serversJson}' | grep -o '"id": *"[^"]*"' | head -1 | grep -o '"[^"]*"\$' | tr -d '"'
                         """, returnStdout: true).trim()
 
                         if (!instanceId) {
-                            error("Nie znaleziono instancji o nazwie '${INSTANCE_NAME}' w regionie ${REGION}")
+                            error("Nie znaleziono instancji o nazwie '${params.INSTANCE_NAME}' w regionie ${params.REGION}")
                         }
                         env.INSTANCE_ID = instanceId
                         echo "Instance ID: ${instanceId}"
@@ -58,20 +86,20 @@ pipeline {
                               -var "tenant_id=${OS_TENANT_ID}" \
                               -var "user_name=${OS_USERNAME}" \
                               -var "password=${OS_PASSWORD}" \
-                              -var "region=${REGION}" \
-                              -var "keypair_name=${KEYPAIR_NAME}" \
+                              -var "region=${params.REGION}" \
+                              -var "keypair_name=${params.KEYPAIR_NAME}" \
                               -var "public_key=\${PUBLIC_KEY}" \
-                              -var "instance_name=${INSTANCE_NAME}" \
-                              openstack_compute_keypair_v2.keypair ${KEYPAIR_NAME} 2>/dev/null || true
+                              -var "instance_name=${params.INSTANCE_NAME}" \
+                              openstack_compute_keypair_v2.keypair ${params.KEYPAIR_NAME} 2>/dev/null || true
 
                             /usr/local/bin/terraform import \
                               -var "tenant_id=${OS_TENANT_ID}" \
                               -var "user_name=${OS_USERNAME}" \
                               -var "password=${OS_PASSWORD}" \
-                              -var "region=${REGION}" \
-                              -var "keypair_name=${KEYPAIR_NAME}" \
+                              -var "region=${params.REGION}" \
+                              -var "keypair_name=${params.KEYPAIR_NAME}" \
                               -var "public_key=\${PUBLIC_KEY}" \
-                              -var "instance_name=${INSTANCE_NAME}" \
+                              -var "instance_name=${params.INSTANCE_NAME}" \
                               openstack_compute_instance_v2.instance ${env.INSTANCE_ID}
                         """
                     }
