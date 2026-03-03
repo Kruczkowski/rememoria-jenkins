@@ -77,13 +77,14 @@ if [ ! -f "\$ENV_FILE" ]; then
 fi
 
 sed -i "s|^TEST_MODE=.*|TEST_MODE=false|" "\$ENV_FILE"
+sed -i "s|^PYTHONPATH=.*|PYTHONPATH=~/rememoria/rememotion-python|" "\$ENV_FILE"
 sed -i "s|^\\(AWS_SQS_ENDPOINT=https\\?://\\)[^/]*|\\1${ovhIp}|" "\$ENV_FILE"
 sed -i "s|^\\(SQS_JOBS_URL=https\\?://\\)[^/]*|\\1${ovhIp}|" "\$ENV_FILE"
 sed -i "s|^\\(SQS_EVENTS_URL=https\\?://\\)[^/]*|\\1${ovhIp}|" "\$ENV_FILE"
 sed -i "s|^\\(AI_PHP_WEBHOOK_URL=https\\?://\\)[^/]*|\\1${ovhIp}|" "\$ENV_FILE"
 
 echo "=== Updated .env entries ==="
-grep -E "^(TEST_MODE|AWS_SQS_ENDPOINT|SQS_JOBS_URL|SQS_EVENTS_URL|AI_PHP_WEBHOOK_URL)=" "\$ENV_FILE"
+grep -E "^(TEST_MODE|PYTHONPATH|AWS_SQS_ENDPOINT|SQS_JOBS_URL|SQS_EVENTS_URL|AI_PHP_WEBHOOK_URL)=" "\$ENV_FILE"
 
 # === Środowisko conda + instalacja ===
 conda create -n rememotion python=3.10 -y 2>/dev/null || true
