@@ -96,6 +96,7 @@ jobs:
           stringParam('POD_ID', '', 'ID poda RunPod')
           stringParam('OVH_IP', '', 'Publiczny adres IP VM OVH (używany w URL-ach)')
           stringParam('BRANCH', 'main', 'Branch do wdrożenia')
+          booleanParam('SETUP_LIVEPORTRAIT', false, 'Uruchom skrypt /opt/setup-liveportrait.sh')
         }
         definition {
           cps {
@@ -128,6 +129,7 @@ jobs:
           stringParam('VM_IP', '', 'Publiczny adres IP VM (z outputu terraform)')
           stringParam('VM_USER', 'ubuntu', 'Użytkownik SSH na VM')
           stringParam('BRANCH', 'main', 'Branch do wdrożenia')
+          booleanParam('REBUILD_IMAGES', false, 'Przebuduj obrazy Dockerowe podczas deployu')
         }
         definition {
           cps {

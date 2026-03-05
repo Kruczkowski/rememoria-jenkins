@@ -15,6 +15,7 @@ pipeline {
         string(name: 'POD_ID', defaultValue: '', description: 'ID poda RunPod')
         string(name: 'OVH_IP', defaultValue: '', description: 'Publiczny adres IP VM OVH (używany w URL-ach)')
         string(name: 'BRANCH', defaultValue: 'main', description: 'Branch do wdrożenia')
+        booleanParam(name: 'SETUP_LIVEPORTRAIT', defaultValue: false, description: 'Uruchom skrypt /opt/setup-liveportrait.sh')
     }
     stages {
         stage('Deploy to RunPod') {
@@ -39,6 +40,7 @@ pipeline {
                         def branch = params.BRANCH
                         def ovhIp = params.OVH_IP
                         def githubToken = env.GITHUB_TOKEN
+                        def setupLivePortrait = params.SETUP_LIVEPORTRAIT
                         echo "SSH: root@${publicIp}:${sshPort}"
 
                         writeFile file: 'remote_deploy.sh', text: """#!/bin/bash
@@ -78,10 +80,10 @@ fi
 
 sed -i "s|^TEST_MODE=.*|TEST_MODE=false|" "\$ENV_FILE"
 sed -i "s|^PYTHONPATH=.*|PYTHONPATH=~/rememoria/rememotion-python|" "\$ENV_FILE"
-sed -i "s|^\\(AWS_SQS_ENDPOINT=https\\?://\\)[^/]*|\\1${ovhIp}|" "\$ENV_FILE"
-sed -i "s|^\\(SQS_JOBS_URL=https\\?://\\)[^/]*|\\1${ovhIp}|" "\$ENV_FILE"
-sed -i "s|^\\(SQS_EVENTS_URL=https\\?://\\)[^/]*|\\1${ovhIp}|" "\$ENV_FILE"
-sed -i "s|^\\(AI_PHP_WEBHOOK_URL=https\\?://\\)[^/]*|\\1${ovhIp}|" "\$ENV_FILE"
+sed -i "s|^\\(AWS_SQS_ENDPOINT=https\\?://\\)[^/:]*[^/]*|\\1${ovhIp}:4566|" "\$ENV_FILE"
+sed -i "s|^\\(SQS_JOBS_URL=https\\?://\\)[^/:]*[^/]*|\\1${ovhIp}:4566|" "\$ENV_FILE"
+sed -i "s|^\\(SQS_EVENTS_URL=https\\?://\\)[^/:]*[^/]*|\\1${ovhIp}:4566|" "\$ENV_FILE"
+sed -i "s|^\\(AI_PHP_WEBHOOK_URL=https\\?://\\)[^/:]*[^/]*|\\1${ovhIp}:8080|" "\$ENV_FILE"
 
 echo "=== Updated .env entries ==="
 grep -E "^(TEST_MODE|PYTHONPATH|AWS_SQS_ENDPOINT|SQS_JOBS_URL|SQS_EVENTS_URL|AI_PHP_WEBHOOK_URL)=" "\$ENV_FILE"
@@ -92,17 +94,17 @@ conda run -n rememotion pip install -U pip setuptools wheel
 conda run -n rememotion pip install rememoria/rememotion-python/.
 
 # === Setup LivePortrait ===
-if [ -f /tmp/setup-liveportrait-runpod.sh ]; then
-    bash /tmp/setup-liveportrait-runpod.sh
+${setupLivePortrait ? '''if [ -f /opt/setup-liveportrait.sh ]; then
+    bash /opt/setup-liveportrait.sh
 else
-    echo "WARNING: /tmp/setup-liveportrait-runpod.sh not found, skipping"
-fi
+    echo "WARNING: /opt/setup-liveportrait.sh not found, skipping"
+fi''' : 'echo "Skipping LivePortrait setup (SETUP_LIVEPORTRAIT=false)"'}
 
 # === Uruchomienie workera w tle ===
 echo "Starting sqs_worker..."
-nohup conda run -n rememotion --no-capture-output \
-    python -m app.worker.sqs_worker \
+nohup /opt/conda/envs/rememotion/bin/python -m app.worker.sqs_worker \
     > /root/worker.log 2>&1 &
+disown
 echo "Worker PID: \$!"
 echo "Logs: tail -f /root/worker.log"
 """
