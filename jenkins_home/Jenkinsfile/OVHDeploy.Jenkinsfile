@@ -34,6 +34,10 @@ if [ -d rememoria/.git ]; then
     cd rememoria
     git remote set-url origin "\$REPO_URL"
     git fetch origin
+    if ! git ls-remote --exit-code --heads origin ${branch} > /dev/null 2>&1; then
+        echo "ERROR: Branch '${branch}' does not exist on remote!"
+        exit 1
+    fi
     git checkout ${branch}
     git reset --hard origin/${branch}
     cd ..

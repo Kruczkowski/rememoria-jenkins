@@ -68,10 +68,11 @@ pipeline {
         stage('Validate parameters') {
             steps {
                 script {
-                    if (!params.NETWORK_VOLUME_ID?.trim()) {
-                        error('Parametr NETWORK_VOLUME_ID jest wymagany!')
+                    if (params.NETWORK_VOLUME_ID?.trim()) {
+                        echo "Network Volume ID: ${params.NETWORK_VOLUME_ID}"
+                    } else {
+                        echo 'NETWORK_VOLUME_ID nie podano - zostanie użyty Pod bez Network Volume'
                     }
-                    echo "Network Volume ID: ${params.NETWORK_VOLUME_ID}"
                     echo "Branch: ${params.BRANCH}"
                 }
             }
@@ -123,20 +124,36 @@ pipeline {
         }
 
         // Stage 3 - tworzenie poda RunPod
-        stage('Create RunPod Pod with Volume') {
+        stage('Create RunPod Pod') {
             steps {
                 script {
-                    def podBuild = build(
-                        job: 'runpod-create-pod-with-volume',
-                        parameters: [
-                            string(name: 'GPU_TYPE',          value: params.GPU_TYPE),
-                            string(name: 'DISK_SIZE',         value: params.DISK_SIZE),
-                            string(name: 'NETWORK_VOLUME_ID', value: params.NETWORK_VOLUME_ID),
-                            string(name: 'IMAGE',             value: params.IMAGE)
-                        ],
-                        propagate: true,
-                        wait: true
-                    )
+                    def podBuild
+                    if (params.NETWORK_VOLUME_ID?.trim()) {
+                        echo "Tworzenie poda z Network Volume: ${params.NETWORK_VOLUME_ID}"
+                        podBuild = build(
+                            job: 'runpod-create-pod-with-volume',
+                            parameters: [
+                                string(name: 'GPU_TYPE',          value: params.GPU_TYPE),
+                                string(name: 'DISK_SIZE',         value: params.DISK_SIZE),
+                                string(name: 'NETWORK_VOLUME_ID', value: params.NETWORK_VOLUME_ID),
+                                string(name: 'IMAGE',             value: params.IMAGE)
+                            ],
+                            propagate: true,
+                            wait: true
+                        )
+                    } else {
+                        echo 'Tworzenie poda bez Network Volume'
+                        podBuild = build(
+                            job: 'runpod-create-pod',
+                            parameters: [
+                                string(name: 'GPU_TYPE',  value: params.GPU_TYPE),
+                                string(name: 'DISK_SIZE', value: params.DISK_SIZE),
+                                string(name: 'IMAGE',     value: params.IMAGE)
+                            ],
+                            propagate: true,
+                            wait: true
+                        )
+                    }
                     def podId = parsePodId(podBuild.description ?: '')
                     if (!podId) {
                         error("Nie udało się odczytać Pod ID z opisu builda. Opis: ${podBuild.description}")

@@ -15,7 +15,7 @@ pipeline {
         string(name: 'POD_ID', defaultValue: '', description: 'ID poda RunPod')
         string(name: 'OVH_IP', defaultValue: '', description: 'Publiczny adres IP VM OVH (używany w URL-ach)')
         string(name: 'BRANCH', defaultValue: 'main', description: 'Branch do wdrożenia')
-        booleanParam(name: 'SETUP_LIVEPORTRAIT', defaultValue: false, description: 'Uruchom skrypt /opt/setup-liveportrait.sh')
+        booleanParam(name: 'SETUP_LIVEPORTRAIT', defaultValue: false, description: 'Uruchom skrypt docker/python-base/setup.sh')
     }
     stages {
         stage('Deploy to RunPod') {
@@ -91,19 +91,21 @@ grep -E "^(TEST_MODE|PYTHONPATH|AWS_SQS_ENDPOINT|SQS_JOBS_URL|SQS_EVENTS_URL|AI_
 # === Środowisko conda + instalacja ===
 conda create -n rememotion python=3.10 -y 2>/dev/null || true
 conda run -n rememotion pip install -U pip setuptools wheel
+conda run -n rememotion pip install python-dotenv
 conda run -n rememotion pip install rememoria/rememotion-python/.
 
 # === Setup LivePortrait ===
-${setupLivePortrait ? '''if [ -f /opt/setup-liveportrait.sh ]; then
-    bash /opt/setup-liveportrait.sh
+${setupLivePortrait ? '''if [ -f ~/rememoria/docker/python-base/setup.sh ]; then
+    bash ~/rememoria/docker/python-base/setup.sh
 else
-    echo "WARNING: /opt/setup-liveportrait.sh not found, skipping"
+    echo "WARNING: ~/rememoria/docker/python-base/setup.sh not found, skipping"
 fi''' : 'echo "Skipping LivePortrait setup (SETUP_LIVEPORTRAIT=false)"'}
 
 # === Uruchomienie workera w tle ===
 echo "Starting sqs_worker..."
-nohup /opt/conda/envs/rememotion/bin/python -m app.worker.sqs_worker \
-    > /root/worker.log 2>&1 &
+cd ~/rememoria/rememotion-python
+/opt/conda/envs/rememotion/bin/pip install .
+nohup /opt/conda/envs/rememotion/bin/python -m app.worker.sqs_worker > /root/worker.log 2>&1 &
 disown
 echo "Worker PID: \$!"
 echo "Logs: tail -f /root/worker.log"
